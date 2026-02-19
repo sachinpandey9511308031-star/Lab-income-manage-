@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>Lab Manager Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #6c63ff;
+    --path: #00b894;
+    --xray: #0984e3;
+    --ultra: #e17055;
+    --bg: #0f0f1a;
+    --card: #1a1a2e;
+    --card2: #16213e;
+    --text: #e8e8f0;
+    --muted: #8888aa;
+    --border: #2a2a4a;
+    --success: #00cec9;
+    --danger: #fd79a8;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; min-height:100vh; }
+  
+  /* DASHBOARD */
+  #dashboard { padding:16px; }
+  .top-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  .top-bar h1 { font-size:1.3rem; font-weight:700; background:linear-gradient(135deg,#6c63ff,#fd79a8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  
+  /* DATE SELECTOR */
+  .date-bar { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; gap:12px; }
+  .date-bar button { background:none; border:none; color:var(--primary); font-size:1.4rem; cursor:pointer; padding:4px 8px; border-radius:8px; transition:background 0.2s; }
+  .date-bar button:hover { background:rgba(108,99,255,0.2); }
+  .date-display { flex:1; text-align:center; }
+  .date-display .ddate { font-size:1.1rem; font-weight:600; }
+  .date-display .dday { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+  
+  /* DEPT BUTTONS */
+  .dept-buttons { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px; }
+  .dept-btn { border:none; border-radius:16px; padding:16px 8px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:6px; transition:all 0.2s; position:relative; overflow:hidden; }
+  .dept-btn::after { content:''; position:absolute; inset:0; background:rgba(255,255,255,0); transition:background 0.2s; }
+  .dept-btn:active::after { background:rgba(255,255,255,0.1); }
+  .dept-btn .icon { font-size:1.8rem; }
+  .dept-btn .label { font-size:0.75rem; font-weight:600; color:white; }
+  .dept-btn .total { font-size:1rem; font-weight:700; color:white; }
+  .dept-btn.path { background:linear-gradient(135deg,#00b894,#00cec9); }
+  .dept-btn.xray { background:linear-gradient(135deg,#0984e3,#6c63ff); }
+  .dept-btn.ultra { background:linear-gradient(135deg,#e17055,#fd79a8); }
+  
+  /* UTILITY BUTTONS */
+  .util-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
+  .util-btn { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:6px; transition:all 0.2s; }
+  .util-btn:hover { border-color:var(--primary); background:var(--card2); }
+  .util-btn .icon { font-size:1.5rem; }
+  .util-btn .label { font-size:0.72rem; color:var(--muted); font-weight:500; text-align:center; }
+  
+  /* TODAY SUMMARY */
+  .today-summary { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:20px; }
+  .today-summary h3 { font-size:0.85rem; color:var(--muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; }
+  .summary-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
+  .summary-row:last-child { border-bottom:none; font-weight:700; color:var(--primary); }
+  .summary-row .dept-name { font-size:0.85rem; }
+  .summary-row .amount { font-size:0.95rem; font-weight:600; }
+
+  /* SCREENS */
+  .screen { display:none; position:fixed; inset:0; background:var(--bg); z-index:100; overflow-y:auto; }
+  .screen.active { display:block; }
+  .screen-header { background:var(--card); border-bottom:1px solid var(--border); padding:16px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10; }
+  .back-btn { background:none; border:none; color:var(--primary); font-size:1.4rem; cursor:pointer; }
+  .screen-header h2 { font-size:1.1rem; font-weight:600; flex:1; }
+  .screen-content { padding:16px; }
+
+  /* PATHOLOGY */
+  .batch-container { margin-bottom:16px; }
+  .batch-header { display:flex; align-items:center; justify-content:space-between; background:var(--card2); border-radius:12px 12px 0 0; padding:10px 14px; border:1px solid var(--border); border-bottom:none; }
+  .batch-header span { font-size:0.8rem; color:var(--muted); }
+  .batch-total { font-size:0.85rem; font-weight:600; color:var(--path); }
+  .batch-rows { border:1px solid var(--border); border-top:none; border-radius:0 0 12px 12px; overflow:hidden; }
+  .patient-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--card); }
+  .patient-row:last-child { border-bottom:none; }
+  .patient-row .sno { width:28px; font-size:0.8rem; color:var(--muted); font-weight:600; }
+  .amount-inp { flex:1; background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text); font-size:0.9rem; width:100%; }
+  .amount-inp:focus { outline:none; border-color:var(--primary); }
+  .add-batch-btn { width:100%; border:2px dashed var(--border); background:transparent; color:var(--muted); border-radius:12px; padding:14px; font-size:0.9rem; cursor:pointer; transition:all 0.2s; margin-bottom:16px; }
+  .add-batch-btn:hover { border-color:var(--path); color:var(--path); }
+  
+  .day-total-box { background:linear-gradient(135deg,rgba(0,184,148,0.15),rgba(0,206,201,0.15)); border:1px solid var(--path); border-radius:14px; padding:16px; text-align:center; margin-bottom:16px; }
+  .day-total-box .label { font-size:0.8rem; color:var(--muted); margin-bottom:4px; }
+  .day-total-box .amount { font-size:1.8rem; font-weight:700; color:var(--path); }
+
+  /* X-RAY / ULTRASOUND */
+  .serial-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--card); }
+  .serial-row:last-child { border-bottom:none; }
+  .serial-row .sno { width:32px; font-size:0.8rem; color:var(--muted); font-weight:600; font-family:monospace; }
+  .serial-list { border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:12px; }
+  .add-serial-btn { background:linear-gradient(135deg,var(--xray),var(--primary)); border:none; color:white; border-radius:12px; padding:14px; font-size:0.9rem; font-weight:600; cursor:pointer; width:100%; margin-bottom:16px; }
+  .add-serial-btn.ultra { background:linear-gradient(135deg,var(--ultra),#fd79a8); }
+
+  /* WEEKLY */
+  .week-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:12px; }
+  .week-card h3 { font-size:0.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+  .week-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:0.9rem; }
+  .week-row:last-child { border-bottom:none; font-weight:700; font-size:1rem; color:var(--primary); }
+
+  /* SELF PATIENTS */
+  .self-dept-tabs { display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; }
+  .tab-btn { border:1px solid var(--border); background:var(--card); color:var(--muted); border-radius:20px; padding:8px 16px; font-size:0.8rem; cursor:pointer; white-space:nowrap; transition:all 0.2s; }
+  .tab-btn.active { color:white; border-color:transparent; }
+  .tab-btn.path.active { background:var(--path); }
+  .tab-btn.xray.active { background:var(--xray); }
+  .tab-btn.ultra.active { background:var(--ultra); }
+  .self-entry-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--card); }
+  .self-date-label { font-size:0.85rem; flex:1; }
+  .self-count-inp { width:70px; background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:8px; color:var(--text); text-align:center; font-size:0.9rem; }
+  .self-count-inp:focus { outline:none; border-color:var(--primary); }
+  .self-month-total { background:linear-gradient(135deg,rgba(108,99,255,0.15),rgba(253,121,168,0.15)); border:1px solid var(--primary); border-radius:14px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+
+  /* GRAPH */
+  .graph-tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .graph-tab { border:1px solid var(--border); background:var(--card); color:var(--muted); border-radius:20px; padding:8px 16px; font-size:0.8rem; cursor:pointer; transition:all 0.2s; flex:1; text-align:center; }
+  .graph-tab.active { background:var(--primary); color:white; border-color:var(--primary); }
+  canvas { border-radius:12px; }
+
+  /* EXCEL DOWNLOAD */
+  .date-range-box { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:16px; }
+  .date-range-box label { font-size:0.8rem; color:var(--muted); display:block; margin-bottom:6px; }
+  .date-inp { width:100%; background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; color:var(--text); font-size:0.9rem; margin-bottom:12px; }
+  .date-inp:focus { outline:none; border-color:var(--primary); }
+  .download-btn { background:linear-gradient(135deg,#00b894,#6c63ff); border:none; color:white; border-radius:12px; padding:16px; font-size:1rem; font-weight:600; cursor:pointer; width:100%; }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:flex-end; }
+  .modal-overlay.show { display:flex; }
+  .modal { background:var(--card); border-radius:24px 24px 0 0; padding:24px; width:100%; }
+  .modal h3 { margin-bottom:16px; font-size:1rem; }
+  .modal input { width:100%; background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:12px; color:var(--text); font-size:1rem; margin-bottom:12px; }
+  .modal input:focus { outline:none; border-color:var(--primary); }
+  .modal-btns { display:flex; gap:10px; }
+  .modal-btns button { flex:1; padding:12px; border-radius:10px; border:none; font-size:0.95rem; font-weight:600; cursor:pointer; }
+  .modal-cancel { background:var(--card2); color:var(--muted); }
+  .modal-ok { background:var(--primary); color:white; }
+
+  .badge { position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.3); border-radius:10px; padding:2px 6px; font-size:0.65rem; color:rgba(255,255,255,0.8); }
+  
+  .section-title { font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="top-bar">
+    <h1>🏥 Lab Manager Pro</h1>
+    <span style="font-size:0.75rem;color:var(--muted)" id="headerDate"></span>
+  </div>
+
+  <!-- DATE BAR -->
+  <div class="date-bar">
+    <button onclick="changeDate(-1)">‹</button>
+    <div class="date-display">
+      <div class="ddate" id="currentDateDisplay"></div>
+      <div class="dday" id="currentDayDisplay"></div>
+    </div>
+    <button onclick="changeDate(1)">›</button>
+  </div>
+
+  <!-- DEPT BUTTONS -->
+  <p class="section-title">Departments</p>
+  <div class="dept-buttons">
+    <button class="dept-btn path" onclick="openScreen('pathScreen')">
+      <span class="icon">🧪</span>
+      <span class="label">Pathology</span>
+      <span class="total" id="dash-path-total">₹0</span>
+    </button>
+    <button class="dept-btn xray" onclick="openScreen('xrayScreen')">
+      <span class="icon">☢️</span>
+      <span class="label">X-Ray</span>
+      <span class="total" id="dash-xray-total">₹0</span>
+    </button>
+    <button class="dept-btn ultra" onclick="openScreen('ultraScreen')">
+      <span class="icon">🔬</span>
+      <span class="label">Ultrasound</span>
+      <span class="total" id="dash-ultra-total">₹0</span>
+    </button>
+  </div>
+
+  <!-- TODAY SUMMARY -->
+  <div class="today-summary" id="todaySummary">
+    <h3>📊 Aaj ka Total</h3>
+    <div class="summary-row"><span class="dept-name">🧪 Pathology</span><span class="amount" id="s-path">₹0</span></div>
+    <div class="summary-row"><span class="dept-name">☢️ X-Ray</span><span class="amount" id="s-xray">₹0</span></div>
+    <div class="summary-row"><span class="dept-name">🔬 Ultrasound</span><span class="amount" id="s-ultra">₹0</span></div>
+    <div class="summary-row"><span class="dept-name">💰 Grand Total</span><span class="amount" id="s-grand">₹0</span></div>
+  </div>
+
+  <!-- UTILITY BUTTONS -->
+  <p class="section-title">Tools</p>
+  <div class="util-buttons">
+    <button class="util-btn" onclick="openScreen('weekScreen')">
+      <span class="icon">📅</span>
+      <span class="label">Weekly Income</span>
+    </button>
+    <button class="util-btn" onclick="openScreen('selfScreen')">
+      <span class="icon">👤</span>
+      <span class="label">Self Patients</span>
+    </button>
+    <button class="util-btn" onclick="openScreen('graphScreen')">
+      <span class="icon">📈</span>
+      <span class="label">Growth Graph</span>
+    </button>
+    <button class="util-btn" onclick="openScreen('excelScreen')">
+      <span class="icon">📊</span>
+      <span class="label">Excel Download</span>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ PATHOLOGY SCREEN ═══════════════════════════ -->
+<div class="screen" id="pathScreen">
+  <div class="screen-header" style="background:linear-gradient(135deg,#004d40,#00695c)">
+    <button class="back-btn" onclick="closeScreen('pathScreen')">←</button>
+    <h2>🧪 Pathology</h2>
+    <span id="path-screen-date" style="font-size:0.75rem;color:rgba(255,255,255,0.7)"></span>
+  </div>
+  <div class="screen-content">
+    <div id="pathBatches"></div>
+    <button class="add-batch-btn" onclick="addPathBatch()">+ Nayi 10 Entry Add Karo</button>
+    <div class="day-total-box">
+      <div class="label">Aaj ka Pathology Total</div>
+      <div class="amount" id="pathDayTotal">₹0</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ X-RAY SCREEN ═══════════════════════════ -->
+<div class="screen" id="xrayScreen">
+  <div class="screen-header" style="background:linear-gradient(135deg,#0d47a1,#1565c0)">
+    <button class="back-btn" onclick="closeScreen('xrayScreen')">←</button>
+    <h2>☢️ X-Ray</h2>
+    <span id="xray-screen-date" style="font-size:0.75rem;color:rgba(255,255,255,0.7)"></span>
+  </div>
+  <div class="screen-content">
+    <div class="serial-list" id="xrayList"></div>
+    <button class="add-serial-btn" onclick="addSerial('xray')">+ Ek Aur Serial Add Karo</button>
+    <div class="day-total-box" style="background:linear-gradient(135deg,rgba(9,132,227,0.15),rgba(108,99,255,0.15));border-color:var(--xray)">
+      <div class="label">Aaj ka X-Ray Total</div>
+      <div class="amount" style="color:var(--xray)" id="xrayDayTotal">₹0</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ULTRASOUND SCREEN ═══════════════════════════ -->
+<div class="screen" id="ultraScreen">
+  <div class="screen-header" style="background:linear-gradient(135deg,#bf360c,#d84315)">
+    <button class="back-btn" onclick="closeScreen('ultraScreen')">←</button>
+    <h2>🔬 Ultrasound</h2>
+    <span id="ultra-screen-date" style="font-size:0.75rem;color:rgba(255,255,255,0.7)"></span>
+  </div>
+  <div class="screen-content">
+    <div class="serial-list" id="ultraList"></div>
+    <button class="add-serial-btn ultra" onclick="addSerial('ultra')">+ Ek Aur Serial Add Karo</button>
+    <div class="day-total-box" style="background:linear-gradient(135deg,rgba(225,112,85,0.15),rgba(253,121,168,0.15));border-color:var(--ultra)">
+      <div class="label">Aaj ka Ultrasound Total</div>
+      <div class="amount" style="color:var(--ultra)" id="ultraDayTotal">₹0</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ WEEKLY SCREEN ═══════════════════════════ -->
+<div class="screen" id="weekScreen">
+  <div class="screen-header">
+    <button class="back-btn" onclick="closeScreen('weekScreen')">←</button>
+    <h2>📅 Weekly Income</h2>
+  </div>
+  <div class="screen-content" id="weekContent"></div>
+</div>
+
+<!-- ═══════════════════════════ SELF PATIENTS SCREEN ═══════════════════════════ -->
+<div class="screen" id="selfScreen">
+  <div class="screen-header">
+    <button class="back-btn" onclick="closeScreen('selfScreen')">←</button>
+    <h2>👤 Self Patients</h2>
+  </div>
+  <div class="screen-content">
+    <div class="self-dept-tabs">
+      <button class="tab-btn path active" onclick="switchSelfTab('path')">🧪 Pathology</button>
+      <button class="tab-btn xray" onclick="switchSelfTab('xray')">☢️ X-Ray</button>
+      <button class="tab-btn ultra" onclick="switchSelfTab('ultra')">🔬 Ultrasound</button>
+    </div>
+    <div id="selfContent"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ GRAPH SCREEN ═══════════════════════════ -->
+<div class="screen" id="graphScreen">
+  <div class="screen-header">
+    <button class="back-btn" onclick="closeScreen('graphScreen')">←</button>
+    <h2>📈 Growth Graph</h2>
+  </div>
+  <div class="screen-content">
+    <div class="graph-tabs">
+      <button class="graph-tab active" onclick="switchGraph('income')">Income</button>
+      <button class="graph-tab" onclick="switchGraph('self')">Self Patients</button>
+    </div>
+    <canvas id="mainChart" height="250"></canvas>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ EXCEL SCREEN ═══════════════════════════ -->
+<div class="screen" id="excelScreen">
+  <div class="screen-header">
+    <button class="back-btn" onclick="closeScreen('excelScreen')">←</button>
+    <h2>📊 Excel Download</h2>
+  </div>
+  <div class="screen-content">
+    <div class="date-range-box">
+      <label>Shuru ki Date</label>
+      <input type="date" class="date-inp" id="excelFrom">
+      <label>Khatam ki Date</label>
+      <input type="date" class="date-inp" id="excelTo">
+    </div>
+    <button class="download-btn" onclick="downloadExcel()">📥 Excel Download Karo</button>
+  </div>
+</div>
+
+<!-- MODAL for amount input -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Amount Dalo</h3>
+    <input type="number" inputmode="numeric" id="modalInput" placeholder="₹ Amount" />
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-ok" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// DATA LAYER - IndexedDB + LocalStorage hybrid
+// ══════════════════════════════════════════════════════
+const STORAGE_KEY = 'labmanager_v2';
+
+function getData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } 
+  catch { return {}; }
+}
+function setData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+
+// Structure:
+// data[dateKey] = {
+//   path: { batches: [[amt,...10], ...] },
+//   xray: { entries: [amt, ...] },
+//   ultra: { entries: [amt, ...] }
+// }
+// data.self[dateKey] = { path: N, xray: N, ultra: N }
+
+function getDay(dateKey) {
+  const d = getData();
+  if (!d[dateKey]) d[dateKey] = { path: { batches: [] }, xray: { entries: [] }, ultra: { entries: [] } };
+  if (!d[dateKey].path) d[dateKey].path = { batches: [] };
+  if (!d[dateKey].xray) d[dateKey].xray = { entries: [] };
+  if (!d[dateKey].ultra) d[dateKey].ultra = { entries: [] };
+  return d;
+}
+function saveDay(dateKey, dayData) {
+  const d = getData();
+  d[dateKey] = dayData;
+  setData(d);
+}
+
+// ══════════════════════════════════════════════════════
+// DATE MANAGEMENT
+// ══════════════════════════════════════════════════════
+const START_DATE = new Date('2026-01-01');
+let currentDate = new Date();
+// Clamp to start
+if (currentDate < START_DATE) currentDate = new Date(START_DATE);
+
+function dateKey(d) {
+  return d.toISOString().split('T')[0];
+}
+function formatDate(d) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+function formatDateHindi(d) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+function changeDate(delta) {
+  const nd = new Date(currentDate);
+  nd.setDate(nd.getDate() + delta);
+  if (nd < START_DATE) return;
+  const today = new Date(); today.setHours(23,59,59);
+  if (nd > today) return;
+  currentDate = nd;
+  updateDateDisplay();
+  updateDashboard();
+}
+function updateDateDisplay() {
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  document.getElementById('currentDateDisplay').textContent = formatDate(currentDate);
+  document.getElementById('currentDayDisplay').textContent = days[currentDate.getDay()] + ' — tap arrows to change';
+  document.getElementById('headerDate').textContent = dateKey(currentDate);
+  
+  const ds = formatDate(currentDate);
+  const el1 = document.getElementById('path-screen-date');
+  const el2 = document.getElementById('xray-screen-date');
+  const el3 = document.getElementById('ultra-screen-date');
+  if(el1) el1.textContent = ds;
+  if(el2) el2.textContent = ds;
+  if(el3) el3.textContent = ds;
+}
+
+// ══════════════════════════════════════════════════════
+// TOTALS
+// ══════════════════════════════════════════════════════
+function pathTotal(dayData) {
+  return (dayData.path.batches || []).reduce((s, b) => s + b.reduce((x,y)=>x+(+y||0),0), 0);
+}
+function xrayTotal(dayData) {
+  return (dayData.xray.entries || []).reduce((s,x)=>s+(+x||0),0);
+}
+function ultraTotal(dayData) {
+  return (dayData.ultra.entries || []).reduce((s,x)=>s+(+x||0),0);
+}
+function fmt(n) { return '₹' + n.toLocaleString('en-IN'); }
+
+function updateDashboard() {
+  const key = dateKey(currentDate);
+  const d = getDay(key);
+  const day = d[key];
+  const pt = pathTotal(day), xt = xrayTotal(day), ut = ultraTotal(day), gt = pt+xt+ut;
+  document.getElementById('dash-path-total').textContent = fmt(pt);
+  document.getElementById('dash-xray-total').textContent = fmt(xt);
+  document.getElementById('dash-ultra-total').textContent = fmt(ut);
+  document.getElementById('s-path').textContent = fmt(pt);
+  document.getElementById('s-xray').textContent = fmt(xt);
+  document.getElementById('s-ultra').textContent = fmt(ut);
+  document.getElementById('s-grand').textContent = fmt(gt);
+}
+
+// ══════════════════════════════════════════════════════
+// SCREENS
+// ══════════════════════════════════════════════════════
+function openScreen(id) {
+  document.getElementById(id).classList.add('active');
+  updateDateDisplay();
+  if (id === 'pathScreen') renderPath();
+  if (id === 'xrayScreen') renderSerial('xray');
+  if (id === 'ultraScreen') renderSerial('ultra');
+  if (id === 'weekScreen') renderWeek();
+  if (id === 'selfScreen') { currentSelfTab = 'path'; renderSelf(); }
+  if (id === 'graphScreen') renderGraph('income');
+  if (id === 'excelScreen') initExcel();
+}
+function closeScreen(id) {
+  document.getElementById(id).classList.remove('active');
+  updateDashboard();
+}
+
+// ══════════════════════════════════════════════════════
+// PATHOLOGY
+// ══════════════════════════════════════════════════════
+let pathAutoSaveTimer = null;
+
+function renderPath() {
+  const key = dateKey(currentDate);
+  const d = getDay(key);
+  const day = d[key];
+  
+  // Ensure at least 1 batch
+  if (!day.path.batches || day.path.batches.length === 0) {
+    day.path.batches = [new Array(10).fill('')];
+    saveDay(key, day);
+  }
+
+  const container = document.getElementById('pathBatches');
+  container.innerHTML = '';
+  let runningTotal = 0;
+
+  day.path.batches.forEach((batch, bi) => {
+    const startNo = bi * 10 + 1;
+    const batchSum = batch.reduce((s,x)=>s+(+x||0),0);
+    runningTotal += batchSum;
+
+    const div = document.createElement('div');
+    div.className = 'batch-container';
+    div.innerHTML = `
+      <div class="batch-header">
+        <span>Patient ${startNo}–${startNo+9}</span>
+        <span class="batch-total">Batch Total: ${fmt(batchSum)}</span>
+      </div>
+      <div class="batch-rows" id="batch-${bi}"></div>
+    `;
+    container.appendChild(div);
+
+    const batchRows = div.querySelector(`#batch-${bi}`);
+    batch.forEach((val, pi) => {
+      const row = document.createElement('div');
+      row.className = 'patient-row';
+      row.innerHTML = `
+        <span class="sno">${startNo + pi}</span>
+        <input class="amount-inp" type="number" inputmode="numeric" placeholder="₹ Amount" value="${val}" 
+          data-bi="${bi}" data-pi="${pi}" />
+      `;
+      const inp = row.querySelector('input');
+      inp.addEventListener('input', (e) => {
+        const b = +e.target.dataset.bi, p = +e.target.dataset.pi;
+        const d2 = getDay(key);
+        d2[key].path.batches[b][p] = e.target.value;
+        saveDay(key, d2[key]);
+        // Debounce re-render
+        clearTimeout(pathAutoSaveTimer);
+        pathAutoSaveTimer = setTimeout(() => { renderPath(); }, 600);
+      });
+      batchRows.appendChild(row);
+    });
+  });
+
+  document.getElementById('pathDayTotal').textContent = fmt(runningTotal);
+}
+
+function addPathBatch() {
+  const key = dateKey(currentDate);
+  const d = getDay(key);
+  if (d[key].path.batches.length >= 10) { alert('Maximum 100 patients (10 batches) ho gaye!'); return; }
+  d[key].path.batches.push(new Array(10).fill(''));
+  saveDay(key, d[key]);
+  renderPath();
+}
+
+// ══════════════════════════════════════════════════════
+// X-RAY & ULTRASOUND
+// ══════════════════════════════════════════════════════
+function renderSerial(dept) {
+  const key = dateKey(currentDate);
+  const d = getDay(key);
+  const day = d[key];
+  const entries = day[dept].entries || [];
+
+  // Ensure minimum 20
+  while (entries.length < 20) entries.push('');
+  day[dept].entries = entries;
+  saveDay(key, day);
+
+  const listEl = document.getElementById(dept + 'List');
+  listEl.innerHTML = '';
+
+  entries.forEach((val, i) => {
+    const row = document.createElement('div');
+    row.className = 'serial-row';
+    row.innerHTML = `
+      <span class="sno">${String(i+1).padStart(2,'0')}</span>
+      <input class="amount-inp" type="number" inputmode="numeric" placeholder="₹ Amount" value="${val}"
+        data-idx="${i}" data-dept="${dept}" />
+    `;
+    const inp = row.querySelector('input');
+    inp.addEventListener('change', (e) => {
+      const idx = +e.target.dataset.idx;
+      const dep = e.target.dataset.dept;
+      const d2 = getDay(key);
+      d2[key][dep].entries[idx] = e.target.value;
+      saveDay(key, d2[key]);
+      calcSerialTotal(dep);
+    });
+    listEl.appendChild(row);
+  });
+
+  calcSerialTotal(dept);
+}
+
+function calcSerialTotal(dept) {
+  const key = dateKey(currentDate);
+  const d = getData();
+  if (!d[key] || !d[key][dept]) return;
+  const total = (d[key][dept].entries || []).reduce((s,x)=>s+(+x||0),0);
+  const el = document.getElementById(dept + 'DayTotal');
+  if (el) el.textContent = fmt(total);
+}
+
+function addSerial(dept) {
+  const key = dateKey(currentDate);
+  const d = getDay(key);
+  d[key][dept].entries.push('');
+  saveDay(key, d[key]);
+  renderSerial(dept);
+}
+
+// ══════════════════════════════════════════════════════
+// WEEKLY
+// ══════════════════════════════════════════════════════
+function renderWeek() {
+  // Last 7 days from currentDate
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const dd = new Date(currentDate);
+    dd.setDate(dd.getDate() - i);
+    days.push(dd);
+  }
+
+  const allData = getData();
+  let weekPath = 0, weekXray = 0, weekUltra = 0;
+
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let rows = '';
+  days.forEach(dd => {
+    const k = dateKey(dd);
+    const day = allData[k] || { path:{batches:[]}, xray:{entries:[]}, ultra:{entries:[]} };
+    const pt = pathTotal(day), xt = xrayTotal(day), ut = ultraTotal(day);
+    weekPath += pt; weekXray += xt; weekUltra += ut;
+    rows += `<div class="week-row"><span>${dayNames[dd.getDay()]} ${dd.getDate()} ${months[dd.getMonth()]}</span><span>${fmt(pt+xt+ut)}</span></div>`;
+  });
+
+  const content = document.getElementById('weekContent');
+  content.innerHTML = `
+    <div class="week-card">
+      <h3>Pichle 7 Din ka Summary</h3>
+      ${rows}
+    </div>
+    <div class="week-card">
+      <h3>Department-wise Total</h3>
+      <div class="week-row"><span>🧪 Pathology</span><span style="color:var(--path)">${fmt(weekPath)}</span></div>
+      <div class="week-row"><span>☢️ X-Ray</span><span style="color:var(--xray)">${fmt(weekXray)}</span></div>
+      <div class="week-row"><span>🔬 Ultrasound</span><span style="color:var(--ultra)">${fmt(weekUltra)}</span></div>
+      <div class="week-row"><span>💰 Sabka Total</span><span>${fmt(weekPath+weekXray+weekUltra)}</span></div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════
+// SELF PATIENTS
+// ══════════════════════════════════════════════════════
+let currentSelfTab = 'path';
+
+function getSelfData() {
+  const d = getData();
+  if (!d._self) d._self = {};
+  return d;
+}
+function saveSelfData(d) { setData(d); }
+
+function switchSelfTab(tab) {
+  currentSelfTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.tab-btn.${tab}`).classList.add('active');
+  renderSelf();
+}
+
+function renderSelf() {
+  const d = getSelfData();
+  const self = d._self || {};
+  
+  // Show current month dates
+  const now = currentDate;
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  
+  let monthTotal = 0;
+  let rows = '<div class="serial-list" style="margin-bottom:12px">';
+  
+  for (let day = 1; day <= lastDay.getDate(); day++) {
+    const dd = new Date(year, month, day);
+    if (dd > new Date()) break;
+    const k = dateKey(dd);
+    const val = self[k] && self[k][currentSelfTab] ? self[k][currentSelfTab] : '';
+    monthTotal += (+val || 0);
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    rows += `
+      <div class="self-entry-row">
+        <span class="self-date-label">${dayNames[dd.getDay()]} ${day}</span>
+        <input class="self-count-inp" type="number" inputmode="numeric" placeholder="0" value="${val}"
+          data-datekey="${k}" data-dept="${currentSelfTab}" onchange="saveSelf(this)" />
+      </div>
+    `;
+  }
+  rows += '</div>';
+
+  const colors = { path: 'var(--path)', xray: 'var(--xray)', ultra: 'var(--ultra)' };
+  const content = document.getElementById('selfContent');
+  content.innerHTML = `
+    <div class="self-month-total">
+      <span>${months[month]} ${year} Total</span>
+      <span style="font-weight:700;color:${colors[currentSelfTab]};font-size:1.1rem">${monthTotal} Patients</span>
+    </div>
+    ${rows}
+  `;
+}
+
+function saveSelf(inp) {
+  const k = inp.dataset.datekey;
+  const dept = inp.dataset.dept;
+  const d = getSelfData();
+  if (!d._self) d._self = {};
+  if (!d._self[k]) d._self[k] = {};
+  d._self[k][dept] = inp.value;
+  saveSelfData(d);
+  renderSelf();
+}
+
+// ══════════════════════════════════════════════════════
+// GRAPH
+// ══════════════════════════════════════════════════════
+let chartInstance = null;
+
+function renderGraph(type) {
+  document.querySelectorAll('.graph-tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0 && type==='income') || (i===1 && type==='self'));
+  });
+  
+  const allData = getData();
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const labels = months;
+
+  const year = currentDate.getFullYear();
+  const pathVals = [], xrayVals = [], ultraVals = [];
+
+  for (let m = 0; m < 12; m++) {
+    let pt = 0, xt = 0, ut = 0;
+    const daysInMonth = new Date(year, m+1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dd = new Date(year, m, day);
+      const k = dateKey(dd);
+      if (type === 'income') {
+        const dayD = allData[k] || { path:{batches:[]}, xray:{entries:[]}, ultra:{entries:[]} };
+        pt += pathTotal(dayD); xt += xrayTotal(dayD); ut += ultraTotal(dayD);
+      } else {
+        const s = allData._self && allData._self[k] ? allData._self[k] : {};
+        pt += (+s.path || 0); xt += (+s.xray || 0); ut += (+s.ultra || 0);
+      }
+    }
+    pathVals.push(pt); xrayVals.push(xt); ultraVals.push(ut);
+  }
+
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  if (chartInstance) chartInstance.destroy();
+  
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Pathology', data: pathVals, backgroundColor: 'rgba(0,184,148,0.7)', borderColor: '#00b894', borderWidth: 1.5, borderRadius: 4 },
+        { label: 'X-Ray', data: xrayVals, backgroundColor: 'rgba(9,132,227,0.7)', borderColor: '#0984e3', borderWidth: 1.5, borderRadius: 4 },
+        { label: 'Ultrasound', data: ultraVals, backgroundColor: 'rgba(225,112,85,0.7)', borderColor: '#e17055', borderWidth: 1.5, borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#e8e8f0', font: { size: 11 } } },
+        title: { display: true, text: (type==='income' ? 'Monthly Income' : 'Monthly Self Patients') + ` — ${year}`, color: '#e8e8f0' }
+      },
+      scales: {
+        x: { ticks: { color: '#8888aa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#8888aa' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+      }
+    }
+  });
+}
+
+function switchGraph(type) { renderGraph(type); }
+
+// ══════════════════════════════════════════════════════
+// EXCEL DOWNLOAD
+// ══════════════════════════════════════════════════════
+function initExcel() {
+  const from = document.getElementById('excelFrom');
+  const to = document.getElementById('excelTo');
+  if (!from.value) from.value = dateKey(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
+  if (!to.value) to.value = dateKey(currentDate);
+}
+
+function downloadExcel() {
+  const from = document.getElementById('excelFrom').value;
+  const to = document.getElementById('excelTo').value;
+  if (!from || !to) { alert('Dono dates bharo!'); return; }
+  
+  const allData = getData();
+  const rows = [['Date', 'Pathology (₹)', 'X-Ray (₹)', 'Ultrasound (₹)', 'Total (₹)',
+                  'Self Path', 'Self XRay', 'Self Ultra']];
+  
+  let d = new Date(from);
+  const end = new Date(to);
+  while (d <= end) {
+    const k = dateKey(d);
+    const day = allData[k] || { path:{batches:[]}, xray:{entries:[]}, ultra:{entries:[]} };
+    const pt = pathTotal(day), xt = xrayTotal(day), ut = ultraTotal(day);
+    const s = allData._self && allData._self[k] ? allData._self[k] : {};
+    rows.push([k, pt, xt, ut, pt+xt+ut, s.path||0, s.xray||0, s.ultra||0]);
+    d.setDate(d.getDate() + 1);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = rows[0].map(() => ({wch: 15}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Lab Data');
+
+  // Summary sheet
+  const sRows = [['Department', 'Total Income', 'Total Self Patients']];
+  let totalPath = 0, totalXray = 0, totalUltra = 0;
+  let selfPath = 0, selfXray = 0, selfUltra = 0;
+  rows.slice(1).forEach(r => {
+    totalPath += r[1]; totalXray += r[2]; totalUltra += r[3];
+    selfPath += r[5]; selfXray += r[6]; selfUltra += r[7];
+  });
+  sRows.push(['Pathology', totalPath, selfPath]);
+  sRows.push(['X-Ray', totalXray, selfXray]);
+  sRows.push(['Ultrasound', totalUltra, selfUltra]);
+  sRows.push(['TOTAL', totalPath+totalXray+totalUltra, selfPath+selfXray+selfUltra]);
+  const ws2 = XLSX.utils.aoa_to_sheet(sRows);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  XLSX.writeFile(wb, `LabData_${from}_to_${to}.xlsx`);
+}
+
+// ══════════════════════════════════════════════════════
+// MODAL (not actively used but kept for future)
+// ══════════════════════════════════════════════════════
+function closeModal() { document.getElementById('modalOverlay').classList.remove('show'); }
+function saveModal() { closeModal(); }
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+updateDateDisplay();
+updateDashboard();
+</script>
+</body>
+</html>
